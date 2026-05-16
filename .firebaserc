@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "prod": "bails-arena-oval-turf",
+    "default": "bails-arena-oval-turf"
+  },
+  "targets": {},
+  "etags": {}
+}
