@@ -15,6 +15,13 @@
         { "fieldPath": "seriesId",  "order": "ASCENDING" },
         { "fieldPath": "date",      "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "blockedSlots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
