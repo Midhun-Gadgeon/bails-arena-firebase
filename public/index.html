@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TurfBook Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast"></div>
+
+<!-- ============ NAV ============ -->
+<nav class="navbar">
+  <div class="nav-brand">⚽ TurfBook</div>
+  <div class="nav-actions">
+    <button class="btn-nav" onclick="showPage('home')">Slots</button>
+    <button class="btn-nav" onclick="showPage('users')">Users</button>
+    <button class="btn-nav" onclick="showPage('reports')">Reports</button>
+  </div>
+</nav>
+
+<!-- ============ HOME PAGE ============ -->
+<div id="page-home" class="page active">
+  <div class="page-header">
+    <h1 class="page-title">Slot Dashboard</h1>
+    <div class="date-nav">
+      <button class="date-btn" onclick="changeDate(-1)">&#8592;</button>
+      <input type="date" id="slotDate" onchange="loadSlots()" />
+      <button class="date-btn" onclick="changeDate(1)">&#8594;</button>
+    </div>
+  </div>
+  <div class="legend">
+    <span class="leg available">Available</span>
+    <span class="leg booked">Booked</span>
+    <span class="leg series">Series</span>
+  </div>
+  <div id="slotsGrid" class="slots-grid">
+    <div class="loading-slots">Loading slots…</div>
+  </div>
+</div>
+
+<!-- ============ BOOKING MODAL ============ -->
+<div id="bookingModal" class="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">New Booking</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Slot info -->
+      <div class="slot-info-bar" id="slotInfoBar"></div>
+
+      <!-- User selection -->
+      <div class="form-group">
+        <label>Customer</label>
+        <div class="user-row">
+          <select id="userSelect" onchange="onUserSelect()">
+            <option value="">— Select existing user —</option>
+          </select>
+          <button class="btn-outline" onclick="toggleNewUser()">+ New</button>
+        </div>
+      </div>
+
+      <!-- New user form -->
+      <div id="newUserForm" class="new-user-form hidden">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="newUserName" placeholder="John Doe" />
+        </div>
+        <div class="form-group">
+          <label>Mobile Number (unique)</label>
+          <input type="tel" id="newUserPhone" placeholder="9876543210" maxlength="10" />
+        </div>
+        <button class="btn-secondary" onclick="createNewUser()">Save User</button>
+      </div>
+
+      <!-- Selected user badge -->
+      <div id="selectedUserBadge" class="user-badge hidden"></div>
+
+      <!-- Slot selection -->
+      <div class="form-group">
+        <label>Slots (select adjacent)</label>
+        <div id="slotPicker" class="slot-picker"></div>
+      </div>
+
+      <!-- Amount -->
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" id="bookingAmount" placeholder="500" min="0" />
+      </div>
+
+      <!-- Series booking -->
+      <div class="form-group">
+        <label>Booking Type</label>
+        <div class="radio-group">
+          <label><input type="radio" name="bookType" value="single" checked onchange="toggleSeries(false)" /> Single Day</label>
+          <label><input type="radio" name="bookType" value="daily" onchange="toggleSeries(true,'daily')" /> Daily Series</label>
+          <label><input type="radio" name="bookType" value="weekly" onchange="toggleSeries(true,'weekly')" /> Weekly Series</label>
+        </div>
+      </div>
+
+      <div id="seriesOptions" class="hidden form-group">
+        <label>Repeat Until</label>
+        <input type="date" id="seriesEndDate" />
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" id="bookingNotes" placeholder="Optional note…" />
+      </div>
+
+      <button class="btn-primary full-width" onclick="saveBooking()">Confirm Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BOOKING DETAIL MODAL ============ -->
+<div id="detailModal" class="modal-overlay" onclick="closeDetailOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Booking Details</h2>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- ============ USERS PAGE ============ -->
+<div id="page-users" class="page">
+  <div class="page-header">
+    <h1 class="page-title">Users</h1>
+    <button class="btn-primary" onclick="openAddUser()">+ Add User</button>
+  </div>
+  <div class="search-bar">
+    <input type="text" id="userSearch" placeholder="Search by name or mobile…" oninput="filterUsers()" />
+  </div>
+  <div id="usersList" class="users-list"></div>
+
+  <!-- Add user modal -->
+  <div id="addUserModal" class="modal-overlay" onclick="closeAddUserOutside(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add New User</h2>
+        <button class="modal-close" onclick="closeAddUserModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="auName" placeholder="Full name" />
+        </div>
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input type="tel" id="auPhone" placeholder="10-digit mobile" maxlength="10" />
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <input type="text" id="auNotes" placeholder="VIP, regular, etc." />
+        </div>
+        <button class="btn-primary full-width" onclick="saveNewUser()">Save User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ REPORTS PAGE ============ -->
+<div id="page-reports" class="page">
+  <div class="page-header">
+    <h1 class="page-title">Reports</h1>
+  </div>
+  <div class="report-filters">
+    <div class="radio-group">
+      <label><input type="radio" name="rType" value="weekly" checked onchange="setReportType('weekly')" /> Weekly</label>
+      <label><input type="radio" name="rType" value="monthly" onchange="setReportType('monthly')" /> Monthly</label>
+      <label><input type="radio" name="rType" value="custom" onchange="setReportType('custom')" /> Custom</label>
+    </div>
+    <div id="weeklyFilter" class="filter-block">
+      <label>Week starting</label>
+      <input type="date" id="weekStart" />
+    </div>
+    <div id="monthlyFilter" class="filter-block hidden">
+      <label>Month</label>
+      <input type="month" id="monthPicker" />
+    </div>
+    <div id="customFilter" class="filter-block hidden">
+      <label>From</label>
+      <input type="date" id="customFrom" />
+      <label>To</label>
+      <input type="date" id="customTo" />
+    </div>
+    <button class="btn-primary" onclick="generateReport()">Generate</button>
+  </div>
+
+  <div id="reportOutput" class="report-output hidden">
+    <div class="report-summary" id="reportSummary"></div>
+    <div class="table-wrap">
+      <table id="reportTable">
+        <thead>
+          <tr>
+            <th>Date</th><th>Slot</th><th>Customer</th><th>Mobile</th><th>Amount (₹)</th><th>Type</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+    </div>
+    <button class="btn-secondary" onclick="downloadCSV()">⬇ Download CSV</button>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
