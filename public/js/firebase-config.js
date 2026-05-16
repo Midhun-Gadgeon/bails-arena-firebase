@@ -6,12 +6,13 @@ import { getFirestore }   from "https://www.gstatic.com/firebasejs/10.12.2/fireb
 import { getAuth }        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey: "AIzaSyA7pC_-qWNdodzbGiRLD7UIIFJDQ8lbznw",
+  authDomain: "bails-arena-oval-turf.firebaseapp.com",
+  projectId: "bails-arena-oval-turf",
+  storageBucket: "bails-arena-oval-turf.firebasestorage.app",
+  messagingSenderId: "128409338004",
+  appId: "1:128409338004:web:c574eeba93ca73cd1cf481",
+  measurementId: "G-31EVQPX4ZJ"
 };
 
 const app = initializeApp(firebaseConfig);
