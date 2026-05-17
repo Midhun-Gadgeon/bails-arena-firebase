@@ -622,12 +622,12 @@ window.sendWhatsApp = function(booking) {
   const turf   = settings.turfName || 'Bails Arena';
 
   const msg =
-    `Hello ${name}!\n\n` +
-    `🏏 Your booking at *${turf}* is confirmed:\n\n` +
-    `📅 Date: *${date}*\n` +
-    `⏰ Slot: *${slot}*\n` +
-    `💰 Amount: *₹${amount}*\n\n` +
-    `Thank you for choosing ${turf}!`;
+  `Hello ${name}!\n\n` +
+  `[BOOKING CONFIRMED]\n\n` +
+  `Date : ${date}\n` +
+  `Slot : ${slot}\n` +
+  `Amount : Rs.${amount}\n\n` +
+  `Thank you for choosing ${turf}!`;
 
   const url =
     `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
