@@ -464,10 +464,10 @@ window.saveBooking = async function() {
   if (!selectedUser)              return showToast('Please select or create a customer', 'error');
   if (tempStartSlot === null || tempEndSlot === null) return showToast('No slot selected', 'error');
 
-  // Open a small controlled redirect page synchronously to preserve the user gesture on iOS/Safari.
-  // We'll send the WhatsApp URL to that page via postMessage after async work completes.
+  // Open a blank popup synchronously to preserve the user gesture on iOS/Safari.
+  // We'll set its location after the async booking work completes.
   let whatsappWindow = null;
-  try { whatsappWindow = window.open('/whatsapp-open.html', '_blank'); } catch (e) { whatsappWindow = null; }
+  try { whatsappWindow = window.open('', '_blank'); } catch (e) { whatsappWindow = null; }
 
   const slots  = [];
   for (let h = tempStartSlot; h < tempEndSlot; h++) slots.push(h);
@@ -637,12 +637,12 @@ window.sendWhatsApp = function(booking, popupWindow) {
     `💰 Amount: *₹${amount}*\n\n` +
     `Thank you for choosing ${turf}! 🏏`;
 
-  const url = `https://api.whatsapp.com/send?phone=91${phone}&text=${encodeURIComponent(msg)}`;
+  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
 
-  // If a popup redirect page was opened synchronously earlier, postMessage the URL to it.
-  if (popupWindow && typeof popupWindow.postMessage === 'function') {
+  // If a popup was opened synchronously earlier, reuse it to navigate to WhatsApp.
+  if (popupWindow && typeof popupWindow.location !== 'undefined') {
     try {
-      popupWindow.postMessage({ url }, window.location.origin);
+      popupWindow.location = url;
       return;
     } catch (e) {
       // ignore and fallback
