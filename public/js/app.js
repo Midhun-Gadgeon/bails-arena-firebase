@@ -630,7 +630,7 @@ window.sendWhatsApp = function(booking) {
     `Thank you for choosing ${turf}! 🏏`;
 
   const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
-  window.open(url, '_blank');
+ window.location.href = url;
 };
 
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
