@@ -6,6 +6,11 @@ import {
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  updateDoc,
+  deleteDoc,
+  doc
+} from "firebase/firestore";
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let currentDate      = todayStr();
@@ -143,10 +148,47 @@ window.closeMobileMenu = function () {
 };
 
 // ─── DATE STRIP ───────────────────────────────────────────────────────────────
-window.shiftWeek = function(delta) {
-  stripStartDate = dateAdd(stripStartDate, delta * 7);
+window.shiftWeek = function(direction){
+
+  currentWeekStart.setDate(
+    currentWeekStart.getDate() + (direction * 7)
+  );
+
   renderDateStrip();
+
+  updateMonthLabel();
+
+  loadSlots();
 };
+
+function updateMonthLabel(){
+
+  const end = new Date(currentWeekStart);
+
+  end.setDate(end.getDate() + 6);
+
+  const startMonth =
+    currentWeekStart.toLocaleString(
+      'default',
+      { month:'long' }
+    );
+
+  const endMonth =
+    end.toLocaleString(
+      'default',
+      { month:'long' }
+    );
+
+  const year = end.getFullYear();
+
+  const label =
+    startMonth === endMonth
+      ? `${startMonth} ${year}`
+      : `${startMonth} / ${endMonth} ${year}`;
+
+  document.getElementById('monthLabel')
+    .textContent = label;
+}
 
 function renderDateStrip() {
   const strip = document.getElementById('dateStrip');
@@ -167,6 +209,7 @@ function renderDateStrip() {
 function selectDate(date) {
   currentDate = date;
   renderDateStrip();
+  updateMonthLabel();
   loadSlots();
 }
 
@@ -682,12 +725,27 @@ function renderUsers(users) {
   }
   list.innerHTML = users.map(u => `
     <div class="user-card">
-      <div class="user-card-info">
-        <div class="user-card-name">${u.name}</div>
-        <div class="user-card-phone">📞 ${u.phone}</div>
-        ${u.notes ? `<div class="user-card-note">${u.notes}</div>` : ''}
-      </div>
-    </div>
+
+  <div class="user-main">
+    <div class="user-name">${user.name}</div>
+    <div class="user-phone">${user.phone}</div>
+  </div>
+
+  <div class="user-actions">
+
+    <button class="btn-small"
+      onclick="editUser('${user.id}')">
+      Edit
+    </button>
+
+    <button class="btn-small danger"
+      onclick="deleteUser('${user.id}')">
+      Delete
+    </button>
+
+  </div>
+
+</div>
   `).join('');
 }
 
@@ -719,6 +777,44 @@ window.saveNewUser = async function() {
   closeModal('addUserModal');
   renderUsers(allUsers);
   showToast('Customer added', 'success');
+};
+
+window.editUser = async function(id){
+
+  const user = allUsers.find(u => u.id === id);
+
+  if(!user) return;
+
+  const name = prompt('Customer Name', user.name);
+  if(name === null) return;
+
+  const phone = prompt('Phone Number', user.phone);
+  if(phone === null) return;
+
+  await updateDoc(doc(db,'users',id),{
+    name,
+    phone
+  });
+
+  showToast('Customer updated');
+
+  loadUsers();
+};
+
+
+window.deleteUser = async function(id){
+
+  const ok = confirm(
+    'Delete this customer?'
+  );
+
+  if(!ok) return;
+
+  await deleteDoc(doc(db,'users',id));
+
+  showToast('Customer deleted');
+
+  loadUsers();
 };
 
 // ─── REPORTS ──────────────────────────────────────────────────────────────────
@@ -880,6 +976,7 @@ async function init() {
 
     stripStartDate = getSundayOfWeek(currentDate);
     renderDateStrip();
+    updateMonthLabel();
 
     // Set report defaults
     document.getElementById('weekStart').value    = dateAdd(currentDate, -6);

@@ -805,6 +805,29 @@ select option { background: var(--surface2); }
   font-size: 0.78rem; color: var(--accent); margin-top: 3px;
 }
 
+.user-card{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.user-actions{
+  display:flex;
+  gap:8px;
+}
+
+.btn-small{
+  padding:6px 12px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.btn-small.danger{
+  background:#dc2626;
+  color:white;
+}
+
 /* ===== REPORTS PAGE ===== */
 .report-filters {
   background: var(--surface);
