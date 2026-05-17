@@ -805,12 +805,6 @@ select option { background: var(--surface2); }
   font-size: 0.78rem; color: var(--accent); margin-top: 3px;
 }
 
-.user-card{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
 .user-actions{
   display:flex;
   gap:8px;
@@ -821,11 +815,13 @@ select option { background: var(--surface2); }
   border:none;
   border-radius:8px;
   cursor:pointer;
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.98rem;
 }
 
 .btn-small.danger{
   background:#dc2626;
   color:white;
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.98rem;
 }
 
 /* ===== REPORTS PAGE ===== */

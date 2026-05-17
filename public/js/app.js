@@ -746,8 +746,8 @@ function renderUsers(users) {
     <div class="user-card">
 
       <div class="user-main">
-        <div class="user-name">${u.name}</div>
-        <div class="user-phone">${u.phone}</div>
+        <div class="user-card-name">${u.name}</div>
+        <div class="user-card-phone">📞  ${u.phone}</div>
       </div>
 
       <div class="user-actions">
