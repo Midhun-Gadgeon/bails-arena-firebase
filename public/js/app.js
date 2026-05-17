@@ -32,6 +32,8 @@ let selectedBlockSlots = [];
 let currentBookingId = null;
 let seriesType       = null;
 let reportData       = [];
+let expenseData      = [];
+let staffData        = [];
 let reportType       = 'weekly';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -884,14 +886,21 @@ window.generateReport = async function() {
     if (!start || !end) return showToast('Set both dates', 'error');
   }
 
-  const snap = await getDocs(query(
-    collection(db, 'bookings'),
-    where('date', '>=', start),
-    where('date', '<=', end),
-    orderBy('date')
-  ));
+  const [bookingSnap, expenseSnap, staffSnap] = await Promise.all([
+    getDocs(query(collection(db, 'bookings'), where('date', '>=', start), where('date', '<=', end), orderBy('date'))),
+    getDocs(query(collection(db, 'expenses'), where('date', '>=', start), where('date', '<=', end), orderBy('date'))),
+    getDocs(query(collection(db, 'staff'), orderBy('name')))
+  ]);
+
   reportData = [];
-  snap.forEach(d => reportData.push({ id: d.id, ...d.data() }));
+  bookingSnap.forEach(d => reportData.push({ id: d.id, ...d.data() }));
+
+  expenseData = [];
+  expenseSnap.forEach(d => expenseData.push({ id: d.id, ...d.data() }));
+
+  staffData = [];
+  staffSnap.forEach(d => staffData.push({ id: d.id, ...d.data() }));
+
   renderReport(start, end);
 };
 
@@ -899,15 +908,21 @@ function renderReport(start, end) {
   const out = document.getElementById('reportOutput');
   out.classList.remove('hidden');
 
-  const totalRev    = reportData.reduce((s, b) => s + (b.amount || 0), 0);
-  const totalSlots  = reportData.reduce((s, b) => s + (b.slots || []).length, 0);
-  const unique      = new Set(reportData.map(b => b.userId)).size;
-  const pending     = reportData.filter(b => b.paymentStatus !== 'paid').reduce((s, b) => s + (b.amount || 0), 0);
+  const totalRev     = reportData.reduce((s, b) => s + (b.amount || 0), 0);
+  const totalSlots   = reportData.reduce((s, b) => s + (b.slots || []).length, 0);
+  const totalExpenses = expenseData.reduce((s, e) => s + (e.amount || 0), 0);
+  const totalSalary  = staffData.reduce((s, sfo) => s + (sfo.salary || 0), 0);
+  const unique       = new Set(reportData.map(b => b.userId)).size;
+  const pending      = reportData.filter(b => b.paymentStatus !== 'paid').reduce((s, b) => s + (b.amount || 0), 0);
+  const netAmount    = totalRev - totalExpenses - totalSalary;
 
   document.getElementById('reportSummary').innerHTML = `
     <div class="summary-card"><div class="sc-val">${reportData.length}</div><div class="sc-label">Bookings</div></div>
     <div class="summary-card"><div class="sc-val">${totalSlots}</div><div class="sc-label">Hours Booked</div></div>
     <div class="summary-card"><div class="sc-val">₹${totalRev.toLocaleString()}</div><div class="sc-label">Revenue</div></div>
+    <div class="summary-card"><div class="sc-val">₹${totalExpenses.toLocaleString()}</div><div class="sc-label">Expenses</div></div>
+    <div class="summary-card"><div class="sc-val">₹${totalSalary.toLocaleString()}</div><div class="sc-label">Staff Salary</div></div>
+    <div class="summary-card ${netAmount < 0 ? 'danger' : ''}"><div class="sc-val">₹${netAmount.toLocaleString()}</div><div class="sc-label">Net</div></div>
     <div class="summary-card"><div class="sc-val">${unique}</div><div class="sc-label">Customers</div></div>
     <div class="summary-card danger"><div class="sc-val">₹${pending.toLocaleString()}</div><div class="sc-label">Pending</div></div>
   `;
@@ -930,11 +945,31 @@ function renderReport(start, end) {
         <td>${b.notes || '—'}</td>
       </tr>`;
   }).join('');
+
+  document.getElementById('reportExpensesBody').innerHTML = expenseData.map(e => `
+      <tr>
+        <td>${e.date}</td>
+        <td>${e.category || '—'}</td>
+        <td>₹${e.amount || 0}</td>
+        <td>${e.notes || '—'}</td>
+      </tr>
+  `).join('');
+
+  document.getElementById('reportStaffBody').innerHTML = staffData.map(s => `
+      <tr>
+        <td>${s.name || '—'}</td>
+        <td>${s.role || '—'}</td>
+        <td>${s.phone || '—'}</td>
+        <td>₹${s.salary || 0}</td>
+        <td>${s.active === false ? 'Inactive' : 'Active'}</td>
+      </tr>
+  `).join('');
 }
+
 
 window.downloadExcel = function() {
   if (!window.XLSX) return showToast('Excel library not loaded', 'error');
-  const rows = [
+  const bookingRows = [
     ['Date', 'Slot', 'Customer', 'Mobile', 'Amount (₹)', 'Payment Status', 'Payment Mode', 'UPI Amount', 'Cash Amount', 'Type', 'Notes'],
     ...reportData.map(b => [
       b.date,
@@ -950,20 +985,45 @@ window.downloadExcel = function() {
       b.notes || ''
     ])
   ];
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const expenseRows = [
+    ['Date', 'Category', 'Amount (₹)', 'Notes'],
+    ...expenseData.map(e => [e.date, e.category || '', e.amount || 0, e.notes || ''])
+  ];
+  const staffRows = [
+    ['Name', 'Role', 'Phone', 'Salary (₹)', 'Status'],
+    ...staffData.map(s => [s.name || '', s.role || '', s.phone || '', s.salary || 0, s.active === false ? 'Inactive' : 'Active'])
+  ];
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookingRows), 'Bookings');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expenseRows), 'Expenses');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffRows), 'Staff');
   XLSX.writeFile(wb, `bails-arena-report-${todayStr()}.xlsx`);
 };
 
 window.downloadCSV = function() {
-  const header = ['Date', 'Slot', 'Customer', 'Mobile', 'Amount', 'Payment Status', 'Mode', 'Type', 'Notes'];
-  const rows   = reportData.map(b => [
+  const bookingHeader = ['Date', 'Slot', 'Customer', 'Mobile', 'Amount', 'Payment Status', 'Mode', 'Type', 'Notes'];
+  const bookingRows = reportData.map(b => [
     b.date, fmtRange(b.slots), b.userName, b.userPhone,
     b.amount || 0, b.paymentStatus || 'pending', b.paymentMode || '',
     b.seriesType || 'Single', b.notes || ''
   ]);
-  const csv  = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const expenseHeader = ['Date', 'Category', 'Amount', 'Notes'];
+  const expenseRows = expenseData.map(e => [e.date, e.category || '', e.amount || 0, e.notes || '']);
+  const staffHeader = ['Name', 'Role', 'Phone', 'Salary', 'Status'];
+  const staffRows = staffData.map(s => [s.name || '', s.role || '', s.phone || '', s.salary || 0, s.active === false ? 'Inactive' : 'Active']);
+
+  const csvRows = [
+    bookingHeader,
+    ...bookingRows,
+    [],
+    expenseHeader,
+    ...expenseRows,
+    [],
+    staffHeader,
+    ...staffRows
+  ];
+  const csv = csvRows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
@@ -1003,6 +1063,132 @@ window.saveSettings = async function() {
   showToast('Settings saved', 'success');
 };
 
+window.loadExpenses = async function() {
+  const date = document.getElementById('expenseDate').value || todayStr();
+  const snap = await getDocs(query(collection(db, 'expenses'), where('date', '==', date)));
+  expenseData = [];
+  snap.forEach(d => expenseData.push({ id: d.id, ...d.data() }));
+  const list = document.getElementById('expenseList');
+  if (!expenseData.length) {
+    list.innerHTML = '<p style="color:var(--text-dim);padding:10px 0">No expenses for this date.</p>';
+    return;
+  }
+  list.innerHTML = expenseData.map(e => `
+    <div class="list-card">
+      <div><strong>${e.category || 'Expense'}</strong> · ₹${e.amount || 0}</div>
+      <div class="list-meta">${e.date} · ${e.notes || 'No note'}</div>
+      <div class="list-actions">
+        <button class="btn-small" onclick="deleteExpense('${e.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.saveExpense = async function() {
+  const date     = document.getElementById('expenseDate').value || todayStr();
+  const category = document.getElementById('expenseCategory').value.trim();
+  const amount   = parseFloat(document.getElementById('expenseAmount').value) || 0;
+  const notes    = document.getElementById('expenseNotes').value.trim();
+
+  if (!category) return showToast('Enter expense category', 'error');
+  if (amount <= 0) return showToast('Enter a valid amount', 'error');
+
+  await addDoc(collection(db, 'expenses'), {
+    date,
+    category,
+    amount,
+    notes,
+    createdAt: Timestamp.now()
+  });
+  document.getElementById('expenseCategory').value = '';
+  document.getElementById('expenseAmount').value = '';
+  document.getElementById('expenseNotes').value = '';
+  showToast('Expense recorded', 'success');
+  loadExpenses();
+};
+
+window.deleteExpense = async function(id) {
+  if (!confirm('Delete this expense?')) return;
+  await deleteDoc(doc(db, 'expenses', id));
+  showToast('Expense deleted', 'success');
+  loadExpenses();
+};
+
+window.loadStaff = async function() {
+  const snap = await getDocs(query(collection(db, 'staff'), orderBy('name')));
+  staffData = [];
+  snap.forEach(d => staffData.push({ id: d.id, ...d.data() }));
+  const list = document.getElementById('staffList');
+  if (!staffData.length) {
+    list.innerHTML = '<p style="color:var(--text-dim);padding:10px 0">No staff recorded yet.</p>';
+    return;
+  }
+  list.innerHTML = staffData.map(s => `
+    <div class="list-card">
+      <div><strong>${s.name || 'Unnamed'}</strong> · ${s.role || 'Role not set'}</div>
+      <div class="list-meta">₹${s.salary || 0} · ${s.phone || 'No phone'} · ${s.active === false ? 'Inactive' : 'Active'}</div>
+      <div class="list-actions">
+        <button class="btn-small" onclick="editStaff('${s.id}')">Edit</button>
+        <button class="btn-small danger" onclick="deleteStaff('${s.id}')">Remove</button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.saveStaff = async function() {
+  const name   = document.getElementById('staffName').value.trim();
+  const role   = document.getElementById('staffRole').value.trim();
+  const salary = parseFloat(document.getElementById('staffSalary').value) || 0;
+  const phone  = document.getElementById('staffPhone').value.trim();
+
+  if (!name) return showToast('Enter staff name', 'error');
+  if (!role) return showToast('Enter staff role', 'error');
+  if (salary <= 0) return showToast('Enter salary amount', 'error');
+
+  await addDoc(collection(db, 'staff'), {
+    name,
+    role,
+    salary,
+    phone,
+    active: true,
+    createdAt: Timestamp.now()
+  });
+
+  document.getElementById('staffName').value = '';
+  document.getElementById('staffRole').value = '';
+  document.getElementById('staffSalary').value = '';
+  document.getElementById('staffPhone').value = '';
+  showToast('Staff added', 'success');
+  loadStaff();
+};
+
+window.editStaff = async function(id) {
+  const staff = staffData.find(s => s.id === id);
+  if (!staff) return;
+
+  const name = prompt('Staff Name', staff.name);
+  if (name === null) return;
+  const role = prompt('Role', staff.role);
+  if (role === null) return;
+  const salaryText = prompt('Salary (₹)', String(staff.salary || 0));
+  if (salaryText === null) return;
+  const salary = parseFloat(salaryText) || 0;
+  const phone = prompt('Phone', staff.phone || '');
+  if (phone === null) return;
+  const active = confirm('Mark staff as active? Press OK for Active, Cancel for Inactive');
+
+  await updateDoc(doc(db, 'staff', id), { name, role, salary, phone, active });
+  showToast('Staff updated', 'success');
+  loadStaff();
+};
+
+window.deleteStaff = async function(id) {
+  if (!confirm('Remove this staff member?')) return;
+  await deleteDoc(doc(db, 'staff', id));
+  showToast('Staff removed', 'success');
+  loadStaff();
+};
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 async function init() {
   try {
@@ -1024,11 +1210,14 @@ async function init() {
 
     // Set block date default
     document.getElementById('blockDate').value = currentDate;
+    document.getElementById('expenseDate').value = currentDate;
 
     // Set active nav
     document.getElementById('nav-home').classList.add('active');
 
     loadSlots();
+    loadExpenses();
+    loadStaff();
   } catch (e) {
     console.error('Init error:', e);
     document.getElementById('slotsGrid').innerHTML =
