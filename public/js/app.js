@@ -612,7 +612,7 @@ window.unblockSlots = async function(blockId) {
   loadSlots();
 };
 
-// ─── WHATSAPP ─────────────────────────────────────────────────────────────────
+/// ─── WHATSAPP ─────────────────────────────────────────────────────────────────
 window.sendWhatsApp = function(booking) {
   const phone  = booking.userPhone;
   const name   = booking.userName;
@@ -622,17 +622,18 @@ window.sendWhatsApp = function(booking) {
   const turf   = settings.turfName || 'Bails Arena';
 
   const msg =
-    `Hello ${name}! 👋\n\n` +
-    `Your booking at *${turf}* is confirmed:\n` +
+    `Hello ${name}!\n\n` +
+    `🏏 Your booking at *${turf}* is confirmed:\n\n` +
     `📅 Date: *${date}*\n` +
     `⏰ Slot: *${slot}*\n` +
     `💰 Amount: *₹${amount}*\n\n` +
-    `Thank you for choosing ${turf}! 🏏`;
+    `Thank you for choosing ${turf}!`;
 
-  const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
- window.location.href = url;
+  const url =
+    `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
+
+  window.open(url, '_blank');
 };
-
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
 window.openPaymentModal = function(bookingId) {
   currentBookingId = bookingId;
