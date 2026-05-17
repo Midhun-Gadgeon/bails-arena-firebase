@@ -506,6 +506,17 @@ window.saveBooking = async function() {
   }
 
   await batch.commit();
+  // Send WhatsApp only for single booking
+// or first booking in a series
+const whatsappBooking = {
+  userName: selectedUser.name,
+  userPhone: selectedUser.phone,
+  date: currentDate,
+  slots,
+  amount
+};
+
+  sendWhatsApp(whatsappBooking);
   closeModal('bookingModal');
   showToast(`Booking confirmed for ${dates.length} day(s)!`, 'success');
   loadSlots();
@@ -609,7 +620,7 @@ window.sendWhatsApp = function(booking) {
     `📅 Date: *${date}*\n` +
     `⏰ Slot: *${slot}*\n` +
     `💰 Amount: *₹${amount}*\n\n` +
-    `Thank you for choosing ${turf}! ⚽`;
+    `Thank you for choosing ${turf}! 🏏`;
 
   const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
