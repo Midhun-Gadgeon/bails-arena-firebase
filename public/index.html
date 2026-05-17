@@ -46,15 +46,39 @@
 
   <!-- NAV -->
   <nav class="navbar">
-    <div class="nav-brand"><img width="40" src="img/logo.png"> </div>
-    <div class="nav-actions">
-      <button class="btn-nav" id="nav-home"     onclick="showPage('home')">Slots</button>
-      <button class="btn-nav" id="nav-users"    onclick="showPage('users')">Customers</button>
-      <button class="btn-nav" id="nav-reports"  onclick="showPage('reports')">Reports</button>
-      <button class="btn-nav" id="nav-settings" onclick="showPage('settings')">Settings</button>
-      <button class="btn-nav btn-logout"        onclick="doLogout()">Logout</button>
-    </div>
-  </nav>
+
+  <div class="nav-brand">
+    <img width="40" src="img/logo.png">
+    Bails Arena
+  </div>
+
+  <button class="hamburger" onclick="toggleMobileMenu()">
+    ☰
+  </button>
+
+  <div class="nav-actions" id="mobileMenu">
+    <button class="btn-nav" id="nav-home" onclick="showPage('home');closeMobileMenu()">
+      Slots
+    </button>
+
+    <button class="btn-nav" id="nav-users" onclick="showPage('users');closeMobileMenu()">
+      Customers
+    </button>
+
+    <button class="btn-nav" id="nav-reports" onclick="showPage('reports');closeMobileMenu()">
+      Reports
+    </button>
+
+    <button class="btn-nav" id="nav-settings" onclick="showPage('settings');closeMobileMenu()">
+      Settings
+    </button>
+
+    <button class="btn-nav btn-logout" onclick="doLogout()">
+      Logout
+    </button>
+  </div>
+
+</nav>
 
   <!-- ============ HOME / SLOTS PAGE ============ -->
   <div id="page-home" class="page active">

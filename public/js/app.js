@@ -132,6 +132,16 @@ window.showPage = function(name) {
   if (name === 'users') loadUsers();
 };
 
+window.toggleMobileMenu = function () {
+  document.getElementById('mobileMenu')
+    .classList.toggle('open');
+};
+
+window.closeMobileMenu = function () {
+  document.getElementById('mobileMenu')
+    .classList.remove('open');
+};
+
 // ─── DATE STRIP ───────────────────────────────────────────────────────────────
 window.shiftWeek = function(delta) {
   stripStartDate = dateAdd(stripStartDate, delta * 7);

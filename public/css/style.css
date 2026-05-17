@@ -137,6 +137,56 @@ body {
   color: var(--booked-text);
 }
 
+/* MOBILE NAV */
+
+.hamburger{
+  display:none;
+  background:none;
+  border:none;
+  color:white;
+  font-size:28px;
+  cursor:pointer;
+}
+
+@media (max-width: 768px){
+
+  .navbar{
+    position:relative;
+  }
+
+  .hamburger{
+    display:block;
+  }
+
+  .nav-actions{
+    position:absolute;
+    top:70px;
+    right:10px;
+    left:10px;
+
+    background:#111827;
+
+    border-radius:16px;
+
+    padding:12px;
+
+    display:none;
+    flex-direction:column;
+    gap:10px;
+
+    z-index:999;
+  }
+
+  .nav-actions.open{
+    display:flex;
+  }
+
+  .btn-nav{
+    width:100%;
+    text-align:left;
+  }
+}
+
 /* ===== PAGES ===== */
 .page { display: none; padding: 0 16px 20px; max-width: 860px; margin: 0 auto; }
 .page.active { display: block; }
