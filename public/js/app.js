@@ -144,8 +144,15 @@ window.doLogout = async function() {
 
 // ─── PAGE NAVIGATION ──────────────────────────────────────────────────────────
 window.showPage = function(name) {
+  const page = document.getElementById(`page-${name}`);
+  if (!page) {
+    console.warn(`showPage: missing page element for '${name}'`);
+    return;
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(`page-${name}`).classList.add('active');
+  page.classList.add('active');
+
   document.querySelectorAll('.btn-nav[id^="nav-"]').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById(`nav-${name}`);
   if (btn) btn.classList.add('active');
