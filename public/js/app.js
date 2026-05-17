@@ -42,13 +42,20 @@ function todayStr() {
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
-function fmtHour(h) { return `${pad(h)}:00`; }
+function to12Hour(h) {
+  if (h === 0) return '12 AM';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
+}
+
+function fmtHour(h) { return to12Hour(h); }
 
 function fmtRange(slots) {
   if (!slots || !slots.length) return '';
   const s = Math.min(...slots);
   const e = Math.max(...slots) + 1;
-  return `${fmtHour(s)} – ${e >= 24 ? '24:00' : fmtHour(e)}`;
+  return `${fmtHour(s)} – ${e >= 24 ? '12 AM' : fmtHour(e)}`;
 }
 
 function showToast(msg, type = '') {
@@ -269,7 +276,7 @@ function renderSlots(bookings, blocked) {
   for (let h = 0; h < 24; h++) {
     const info   = hourMap[h];
     const tile   = document.createElement('div');
-    const endTime = fmtHour(h + 1 > 23 ? 0 : h + 1);
+    const endTime = to12Hour(h + 1 > 23 ? 0 : h + 1);
 
     if (!info) {
       tile.className = 'slot-tile available';
@@ -279,7 +286,7 @@ function renderSlots(bookings, blocked) {
       tile.onclick = () => openEndTimePicker(h);
     } else if (info.type === 'booked') {
       const b = info.data;
-      const slotEnd = fmtHour(Math.max(...b.slots) + 1 > 23 ? 0 : Math.max(...b.slots) + 1);
+      const slotEnd = to12Hour(Math.max(...b.slots) + 1 > 23 ? 0 : Math.max(...b.slots) + 1);
       const isPaid  = b.paymentStatus === 'paid';
       tile.className = 'slot-tile booked';
       tile.innerHTML = `
@@ -337,7 +344,7 @@ window.openEndTimePicker = function(startHour) {
       const dur  = endH - startHour;
       const btn  = document.createElement('div');
       btn.className = 'end-time-btn';
-      btn.innerHTML = `<span class="et-time">${endH >= 24 ? '24:00' : fmtHour(endH)}</span><span class="et-dur">${dur} hr${dur > 1 ? 's' : ''}</span>`;
+      btn.innerHTML = `<span class="et-time">${endH >= 24 ? '12 AM' : fmtHour(endH)}</span><span class="et-dur">${dur} hr${dur > 1 ? 's' : ''}</span>`;
       btn.onclick = () => { closeSheet(); openBookingModal(startHour, endH); };
       optionsEl.appendChild(btn);
     });
@@ -379,7 +386,7 @@ window.openBookingModal = function(startH, endH) {
   priceHint.textContent = priceLabel;
 
   document.getElementById('slotInfoBar').textContent =
-    `📅 ${currentDate}  ·  ⏰ ${fmtHour(startH)} – ${endH >= 24 ? '24:00' : fmtHour(endH)}  ·  ${slots} hr${slots > 1 ? 's' : ''}`;
+    `📅 ${currentDate}  ·  ⏰ ${fmtHour(startH)} – ${endH >= 24 ? '12 AM' : fmtHour(endH)}  ·  ${slots} hr${slots > 1 ? 's' : ''}`;
 
   populateUserDropdown();
   document.getElementById('bookingModal').classList.add('open');
