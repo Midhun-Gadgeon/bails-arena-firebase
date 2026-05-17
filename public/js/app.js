@@ -35,6 +35,8 @@ let reportData       = [];
 let expenseData      = [];
 let staffData        = [];
 let reportType       = 'weekly';
+let reportStartDate  = null;
+let reportEndDate    = null;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -896,6 +898,9 @@ window.generateReport = async function() {
     if (!start || !end) return showToast('Set both dates', 'error');
   }
 
+  reportStartDate = start;
+  reportEndDate   = end;
+
   const [bookingSnap, expenseSnap, staffSnap] = await Promise.all([
     getDocs(query(collection(db, 'bookings'), where('date', '>=', start), where('date', '<=', end), orderBy('date'))),
     getDocs(query(collection(db, 'expenses'), where('date', '>=', start), where('date', '<=', end), orderBy('date'))),
@@ -918,24 +923,28 @@ function renderReport(start, end) {
   const out = document.getElementById('reportOutput');
   out.classList.remove('hidden');
 
+  // Check if report should include staff (not weekly, or custom > 1 month)
+  const includeStaff = shouldIncludeStaff();
+
   const totalRev     = reportData.reduce((s, b) => s + (b.amount || 0), 0);
   const totalSlots   = reportData.reduce((s, b) => s + (b.slots || []).length, 0);
   const totalExpenses = expenseData.reduce((s, e) => s + (e.amount || 0), 0);
-  const totalSalary  = staffData.reduce((s, sfo) => s + (sfo.salary || 0), 0);
+  const totalSalary  = includeStaff ? staffData.reduce((s, sfo) => s + (sfo.salary || 0), 0) : 0;
   const unique       = new Set(reportData.map(b => b.userId)).size;
   const pending      = reportData.filter(b => b.paymentStatus !== 'paid').reduce((s, b) => s + (b.amount || 0), 0);
   const netAmount    = totalRev - totalExpenses - totalSalary;
 
-  document.getElementById('reportSummary').innerHTML = `
+  const summaryCards = `
     <div class="summary-card"><div class="sc-val">${reportData.length}</div><div class="sc-label">Bookings</div></div>
     <div class="summary-card"><div class="sc-val">${totalSlots}</div><div class="sc-label">Hours Booked</div></div>
     <div class="summary-card"><div class="sc-val">₹${totalRev.toLocaleString()}</div><div class="sc-label">Revenue</div></div>
     <div class="summary-card"><div class="sc-val">₹${totalExpenses.toLocaleString()}</div><div class="sc-label">Expenses</div></div>
-    <div class="summary-card"><div class="sc-val">₹${totalSalary.toLocaleString()}</div><div class="sc-label">Staff Salary</div></div>
+    ${includeStaff ? `<div class="summary-card"><div class="sc-val">₹${totalSalary.toLocaleString()}</div><div class="sc-label">Staff Salary</div></div>` : ''}
     <div class="summary-card ${netAmount < 0 ? 'danger' : ''}"><div class="sc-val">₹${netAmount.toLocaleString()}</div><div class="sc-label">Net</div></div>
     <div class="summary-card"><div class="sc-val">${unique}</div><div class="sc-label">Customers</div></div>
     <div class="summary-card danger"><div class="sc-val">₹${pending.toLocaleString()}</div><div class="sc-label">Pending</div></div>
   `;
+  document.getElementById('reportSummary').innerHTML = summaryCards;
 
   document.getElementById('reportBody').innerHTML = reportData.map(b => {
     const paid = b.paymentStatus === 'paid';
@@ -974,11 +983,33 @@ function renderReport(start, end) {
         <td>${s.active === false ? 'Inactive' : 'Active'}</td>
       </tr>
   `).join('');
+
+  // Hide staff section if not included in this report
+  const staffSection = document.querySelector('.report-section:has(#reportStaffTable)');
+  if (staffSection) {
+    staffSection.style.display = includeStaff ? 'block' : 'none';
+  }
+}
+
+// Check if staff should be included in report
+function shouldIncludeStaff() {
+  if (reportType === 'weekly') return false;
+  if (reportType === 'monthly') return true;
+  // For custom reports, include only if span is > 30 days
+  if (reportType === 'custom') {
+    const startDate = new Date(reportStartDate);
+    const endDate = new Date(reportEndDate);
+    const daysDiff = (endDate - startDate) / (1000 * 60 * 60 * 24);
+    return daysDiff > 30;
+  }
+  return false;
 }
 
 
 window.downloadExcel = function() {
   if (!window.XLSX) return showToast('Excel library not loaded', 'error');
+  const includeStaff = shouldIncludeStaff();
+
   const bookingRows = [
     ['Date', 'Slot', 'Customer', 'Mobile', 'Amount (₹)', 'Payment Status', 'Payment Mode', 'UPI Amount', 'Cash Amount', 'Type', 'Notes'],
     ...reportData.map(b => [
@@ -999,19 +1030,23 @@ window.downloadExcel = function() {
     ['Date', 'Category', 'Amount (₹)', 'Notes'],
     ...expenseData.map(e => [e.date, e.category || '', e.amount || 0, e.notes || ''])
   ];
-  const staffRows = [
+  const staffRows = includeStaff ? [
     ['Name', 'Role', 'Phone', 'Salary (₹)', 'Status'],
     ...staffData.map(s => [s.name || '', s.role || '', s.phone || '', s.salary || 0, s.active === false ? 'Inactive' : 'Active'])
-  ];
+  ] : null;
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookingRows), 'Bookings');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expenseRows), 'Expenses');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffRows), 'Staff');
+  if (staffRows) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffRows), 'Staff');
+  }
   XLSX.writeFile(wb, `bails-arena-report-${todayStr()}.xlsx`);
 };
 
 window.downloadCSV = function() {
+  const includeStaff = shouldIncludeStaff();
+
   const bookingHeader = ['Date', 'Slot', 'Customer', 'Mobile', 'Amount', 'Payment Status', 'Mode', 'Type', 'Notes'];
   const bookingRows = reportData.map(b => [
     b.date, fmtRange(b.slots), b.userName, b.userPhone,
@@ -1020,19 +1055,19 @@ window.downloadCSV = function() {
   ]);
   const expenseHeader = ['Date', 'Category', 'Amount', 'Notes'];
   const expenseRows = expenseData.map(e => [e.date, e.category || '', e.amount || 0, e.notes || '']);
-  const staffHeader = ['Name', 'Role', 'Phone', 'Salary', 'Status'];
-  const staffRows = staffData.map(s => [s.name || '', s.role || '', s.phone || '', s.salary || 0, s.active === false ? 'Inactive' : 'Active']);
+  const staffHeader = includeStaff ? ['Name', 'Role', 'Phone', 'Salary', 'Status'] : null;
+  const staffRows = includeStaff ? staffData.map(s => [s.name || '', s.role || '', s.phone || '', s.salary || 0, s.active === false ? 'Inactive' : 'Active']) : [];
 
   const csvRows = [
     bookingHeader,
     ...bookingRows,
     [],
     expenseHeader,
-    ...expenseRows,
-    [],
-    staffHeader,
-    ...staffRows
+    ...expenseRows
   ];
+  if (includeStaff && staffHeader) {
+    csvRows.push([], staffHeader, ...staffRows);
+  }
   const csv = csvRows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a    = document.createElement('a');
