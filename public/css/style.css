@@ -289,6 +289,12 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+@media (max-width: 768px){
+.date-pill {
+  padding: 7px 7px;
+  min-width: 43px;
+}
+}
 
 /* ===== SLOTS TOOLBAR ===== */
 .slots-toolbar {
