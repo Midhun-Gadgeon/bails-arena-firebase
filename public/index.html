@@ -217,10 +217,7 @@
     </div>
 
     <div id="reportOutput" class="report-output hidden">
-      <div class="report-actions">
-        <button class="btn-secondary" onclick="downloadExcel()">📊 Export Excel</button>
-        <button class="btn-secondary" onclick="downloadCSV()">📄 Export CSV</button>
-      </div>
+      
       <div class="report-summary" id="reportSummary"></div>
       <div class="table-wrap">
         <table id="reportTable">
@@ -254,6 +251,10 @@
             <tbody id="reportStaffBody"></tbody>
           </table>
         </div>
+      </div>
+      <div class="report-actions">
+        <button class="btn-secondary" onclick="downloadExcel()">📥 Download Excel</button>
+        <button class="btn-secondary" onclick="downloadCSV()">📥 Download CSV</button>
       </div>
     </div>
   </div>
@@ -294,6 +295,7 @@
       </div>
     </div>
     <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+    <button class="btn-secondary btn-clear-cache" onclick="clearCacheAndReload()">Clear Cache & Reload</button>
   </div>
 
 </div><!-- end mainApp -->

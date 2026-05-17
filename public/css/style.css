@@ -912,6 +912,9 @@ tr:hover td { background: var(--surface2); }
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
+.btn-secondary .btn-clear-cache{
+  margin-left: 10px;
+}
 
 /* ===== TOAST ===== */
 .toast {

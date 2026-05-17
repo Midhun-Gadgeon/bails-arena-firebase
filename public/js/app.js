@@ -69,6 +69,31 @@ function showToast(msg, type = '') {
   setTimeout(() => (t.className = 'toast'), 2800);
 }
 
+// Clear service worker caches and reload the app (useful for PWA cache issues)
+window.clearCacheAndReload = async function() {
+  showToast('Clearing cache...');
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    // Give UX a moment, then reload with a cache-busting query param
+    setTimeout(() => {
+      showToast('Reloading…');
+      const url = new URL(location.href);
+      url.searchParams.set('cachebust', Date.now());
+      location.href = url.toString();
+    }, 700);
+  } catch (err) {
+    console.error('clearCacheAndReload error', err);
+    showToast('Failed to clear cache', 'error');
+  }
+}
+
 function dateAdd(str, days) {
   const [y, m, d] = str.split('-').map(Number);
   const dt = new Date(y, m - 1, d + days);
