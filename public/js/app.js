@@ -1,16 +1,22 @@
 import { db, auth } from './firebase-config.js';
 import {
-  collection, doc, getDocs, addDoc, setDoc, deleteDoc, getDoc,
-  query, where, orderBy, Timestamp, writeBatch
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  setDoc,
+  deleteDoc,
+  getDoc,
+  query,
+  where,
+  orderBy,
+  Timestamp,
+  writeBatch,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  updateDoc,
-  deleteDoc,
-  doc
-} from "firebase/firestore";
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let currentDate      = todayStr();
@@ -148,11 +154,14 @@ window.closeMobileMenu = function () {
 };
 
 // ─── DATE STRIP ───────────────────────────────────────────────────────────────
-window.shiftWeek = function(direction){
+window.shiftWeek = function(direction) {
 
-  currentWeekStart.setDate(
-    currentWeekStart.getDate() + (direction * 7)
+  stripStartDate = dateAdd(
+    stripStartDate,
+    direction * 7
   );
+
+  currentDate = stripStartDate;
 
   renderDateStrip();
 
@@ -161,14 +170,16 @@ window.shiftWeek = function(direction){
   loadSlots();
 };
 
-function updateMonthLabel(){
+function updateMonthLabel() {
 
-  const end = new Date(currentWeekStart);
+  const start = new Date(stripStartDate);
+
+  const end = new Date(start);
 
   end.setDate(end.getDate() + 6);
 
   const startMonth =
-    currentWeekStart.toLocaleString(
+    start.toLocaleString(
       'default',
       { month:'long' }
     );
@@ -718,34 +729,43 @@ async function loadUsers() {
 }
 
 function renderUsers(users) {
-  const list = document.getElementById('usersList');
+
+  const list =
+    document.getElementById('usersList');
+
   if (!users.length) {
-    list.innerHTML = '<p style="color:var(--text-dim);padding:20px 0">No customers found.</p>';
+
+    list.innerHTML =
+      '<p style="color:var(--text-dim);padding:20px 0">No customers found.</p>';
+
     return;
   }
+
   list.innerHTML = users.map(u => `
+
     <div class="user-card">
 
-  <div class="user-main">
-    <div class="user-name">${user.name}</div>
-    <div class="user-phone">${user.phone}</div>
-  </div>
+      <div class="user-main">
+        <div class="user-name">${u.name}</div>
+        <div class="user-phone">${u.phone}</div>
+      </div>
 
-  <div class="user-actions">
+      <div class="user-actions">
 
-    <button class="btn-small"
-      onclick="editUser('${user.id}')">
-      Edit
-    </button>
+        <button class="btn-small"
+          onclick="editUser('${u.id}')">
+          Edit
+        </button>
 
-    <button class="btn-small danger"
-      onclick="deleteUser('${user.id}')">
-      Delete
-    </button>
+        <button class="btn-small danger"
+          onclick="deleteUser('${u.id}')">
+          Delete
+        </button>
 
-  </div>
+      </div>
 
-</div>
+    </div>
+
   `).join('');
 }
 
