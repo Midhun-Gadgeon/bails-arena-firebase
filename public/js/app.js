@@ -464,6 +464,11 @@ window.saveBooking = async function() {
   if (!selectedUser)              return showToast('Please select or create a customer', 'error');
   if (tempStartSlot === null || tempEndSlot === null) return showToast('No slot selected', 'error');
 
+  // Open a blank popup synchronously to preserve the user gesture on iOS/Safari.
+  // We'll set its location after the async booking work completes.
+  let whatsappWindow = null;
+  try { whatsappWindow = window.open('', '_blank'); } catch (e) { whatsappWindow = null; }
+
   const slots  = [];
   for (let h = tempStartSlot; h < tempEndSlot; h++) slots.push(h);
 
@@ -523,7 +528,10 @@ const whatsappBooking = {
   amount
 };
 
-  sendWhatsApp(whatsappBooking);
+  // Attempt to open WhatsApp using the pre-opened popup to avoid iOS blocking.
+  // If the popup was blocked (null), sendWhatsApp will attempt a normal open and
+  // show a toast if that is blocked as well.
+  sendWhatsApp(whatsappBooking, whatsappWindow);
   closeModal('bookingModal');
   showToast(`Booking confirmed for ${dates.length} day(s)!`, 'success');
   loadSlots();
@@ -613,7 +621,7 @@ window.unblockSlots = async function(blockId) {
 };
 
 // ─── WHATSAPP ─────────────────────────────────────────────────────────────────
-window.sendWhatsApp = function(booking) {
+window.sendWhatsApp = function(booking, popupWindow) {
   const phone  = booking.userPhone;
   const name   = booking.userName;
   const date   = booking.date;
@@ -630,7 +638,22 @@ window.sendWhatsApp = function(booking) {
     `Thank you for choosing ${turf}! 🏏`;
 
   const url = `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`;
-  window.open(url, '_blank');
+
+  // If a popup was opened synchronously earlier, reuse it to navigate to WhatsApp.
+  if (popupWindow && typeof popupWindow.location !== 'undefined') {
+    try {
+      popupWindow.location = url;
+      return;
+    } catch (e) {
+      // ignore and fallback
+    }
+  }
+
+  // Fallback: try to open normally. On iOS this may be blocked if not a user gesture.
+  const w = window.open(url, '_blank');
+  if (!w) {
+    showToast('Popup blocked — tap "Send WhatsApp" to open message.', 'error');
+  }
 };
 
 // ─── PAYMENT MODAL ────────────────────────────────────────────────────────────
