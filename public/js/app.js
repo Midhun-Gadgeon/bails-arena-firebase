@@ -759,6 +759,7 @@ function renderUsers(users) {
       <div class="user-main">
         <div class="user-card-name">${u.name}</div>
         <div class="user-card-phone">📞  ${u.phone}</div>
+        ${u.notes ? `<div class="user-card-note">${u.notes}</div>` : ''}
       </div>
 
       <div class="user-actions">
