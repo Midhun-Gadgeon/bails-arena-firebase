@@ -156,7 +156,10 @@ window.showPage = function(name) {
   document.querySelectorAll('.btn-nav[id^="nav-"]').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById(`nav-${name}`);
   if (btn) btn.classList.add('active');
+
   if (name === 'users') loadUsers();
+  if (name === 'expenses') loadExpenses();
+  if (name === 'staff') loadStaff();
 };
 
 window.toggleMobileMenu = function () {
