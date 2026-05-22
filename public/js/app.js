@@ -350,40 +350,79 @@ function renderSlots(bookings, blocked) {
 }
 
 // ─── END TIME PICKER ──────────────────────────────────────────────────────────
-window.openEndTimePicker = function(startHour) {
+window.openEndTimePicker = async function(startHour) {
   tempStartSlot = startHour;
-  const taken = new Set();
+  const takenCur = new Set();
   const bks = bookingsCache[currentDate] || [];
   const bls = blockedCache[currentDate]  || [];
-  bks.forEach(b => (b.slots || []).forEach(s => taken.add(s)));
-  bls.forEach(b => (b.slots || []).forEach(s => taken.add(s)));
+  bks.forEach(b => (b.slots || []).forEach(s => takenCur.add(s)));
+  bls.forEach(b => (b.slots || []).forEach(s => takenCur.add(s)));
 
-  // Collect consecutive available hours after startHour
+  const allowCross = !!(document.getElementById('settingAllowCrossMidnight') && document.getElementById('settingAllowCrossMidnight').checked);
+  const maxExtraHours = 6; // allow up to 6 hours into next day when enabled
+  const maxEnd = allowCross ? 24 + maxExtraHours : 24;
+
+  // If cross-midnight enabled, fetch next-day taken slots (if not cached)
+  let takenNext = new Set();
+  let nextDate = dateAdd(currentDate, 1);
+  if (allowCross) {
+    // ensure bookingsCache/blockedCache contains nextDate; fetch on demand
+    if (!bookingsCache[nextDate] || !blockedCache[nextDate]) {
+      try {
+        const [bSnap, blSnap] = await Promise.all([
+          getDocs(query(collection(db, 'bookings'), where('date', '==', nextDate))),
+          getDocs(query(collection(db, 'blockedSlots'), where('date', '==', nextDate)))
+        ]);
+        const nB = [];
+        bSnap.forEach(d => nB.push({ id: d.id, ...d.data() }));
+        const nBl = [];
+        blSnap.forEach(d => nBl.push({ id: d.id, ...d.data() }));
+        bookingsCache[nextDate] = nB;
+        blockedCache[nextDate] = nBl;
+      } catch (e) {
+        console.warn('Failed to fetch next-day slots for cross-midnight check', e);
+      }
+    }
+    const bk2 = bookingsCache[nextDate] || [];
+    const bl2 = blockedCache[nextDate]  || [];
+    bk2.forEach(b => (b.slots || []).forEach(s => takenNext.add(s)));
+    bl2.forEach(b => (b.slots || []).forEach(s => takenNext.add(s)));
+  }
+
   const options = [];
-  for (let h = startHour + 1; h <= 24; h++) {
-    if (taken.has(h) || h === 24) break;
+  // iterate candidate end times; h represents the exclusive end hour in absolute terms (0..24+maxExtra)
+  for (let h = startHour + 1; h <= maxEnd; h++) {
+    // determine the slot index to check for availability: slot to check is h-1
+    if (h - 1 < 24) {
+      if (takenCur.has(h - 1)) break;
+    } else {
+      // next day slot index
+      if (!allowCross) break;
+      const idx = (h - 1) - 24;
+      if (takenNext.has(idx)) break;
+    }
     options.push(h);
   }
-  // Always allow single-hour even if no multi-hour options
-  // For single hour: endHour = startHour+1 (exclusive end)
 
   const titleEl   = document.getElementById('endSheetTitle');
   const optionsEl = document.getElementById('endTimeOptions');
   titleEl.textContent = `Start: ${fmtHour(startHour)} — Select End Time`;
   optionsEl.innerHTML = '';
 
-  // Include the single-slot option (end = startHour+1)
-  const allEndOptions = [startHour + 1, ...options];
-  const uniqueEnds = [...new Set(allEndOptions)].filter(h => h <= 24);
-
-  if (!uniqueEnds.length) {
+  if (!options.length) {
     optionsEl.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px 0">No consecutive slots available.</p>';
   } else {
-    uniqueEnds.forEach(endH => {
+    options.forEach(endH => {
       const dur  = endH - startHour;
       const btn  = document.createElement('div');
       btn.className = 'end-time-btn';
-      btn.innerHTML = `<span class="et-time">${endH >= 24 ? '12 AM' : fmtHour(endH)}</span><span class="et-dur">${dur} hr${dur > 1 ? 's' : ''}</span>`;
+      let timeLabel = '';
+      if (endH >= 24) {
+        timeLabel = `${fmtHour(endH - 24)} (next day)`;
+      } else {
+        timeLabel = fmtHour(endH);
+      }
+      btn.innerHTML = `<span class="et-time">${timeLabel}</span><span class="et-dur">${dur} hr${dur > 1 ? 's' : ''}</span>`;
       btn.onclick = () => { closeSheet(); openBookingModal(startHour, endH); };
       optionsEl.appendChild(btn);
     });
@@ -415,17 +454,27 @@ window.openBookingModal = function(startH, endH) {
   document.getElementById('bookingNotes').value  = '';
   document.querySelector('input[name="bookType"][value="single"]').checked = true;
 
-  // Auto-fill amount
-  const slots    = endH - startH;
-  const amount   = getPriceForDate(currentDate, slots);
+  // Auto-fill amount (handle cross-midnight endH > 24)
+  let amount = 0;
+  if (endH <= 24) {
+    const slots = endH - startH;
+    amount = getPriceForDate(currentDate, slots);
+  } else {
+    const slotsFirst = 24 - startH;
+    const nextDate = dateAdd(currentDate, 1);
+    const slotsNext = endH - 24;
+    amount = getPriceForDate(currentDate, slotsFirst) + getPriceForDate(nextDate, slotsNext);
+  }
   document.getElementById('bookingAmount').value = amount;
 
   const priceHint = document.getElementById('priceHint');
   const priceLabel = isWeekend(currentDate) ? `Weekend rate: ₹${settings.weekendPrice}/hr` : `Weekday rate: ₹${settings.weekdayPrice}/hr`;
   priceHint.textContent = priceLabel;
 
-  document.getElementById('slotInfoBar').textContent =
-    `📅 ${currentDate}  ·  ⏰ ${fmtHour(startH)} – ${endH >= 24 ? '12 AM' : fmtHour(endH)}  ·  ${slots} hr${slots > 1 ? 's' : ''}`;
+  // Slot info (show next day if needed)
+  const slotsCount = tempEndSlot - tempStartSlot;
+  const endLabel = tempEndSlot > 24 ? `${fmtHour(tempEndSlot - 24)} (next day)` : (tempEndSlot === 24 ? '12 AM' : fmtHour(tempEndSlot));
+  document.getElementById('slotInfoBar').textContent = `📅 ${currentDate}  ·  ⏰ ${fmtHour(startH)} – ${endLabel}  ·  ${slotsCount} hr${slotsCount > 1 ? 's' : ''}`;
 
   populateUserDropdown();
   document.getElementById('bookingModal').classList.add('open');
@@ -517,30 +566,51 @@ window.saveBooking = async function() {
   }
 
   // Conflict check
-  for (const date of dates) {
-    const [bSnap, blSnap] = await Promise.all([
-      getDocs(query(collection(db, 'bookings'),     where('date', '==', date))),
-      getDocs(query(collection(db, 'blockedSlots'), where('date', '==', date)))
-    ]);
-    const taken = new Set();
-    bSnap.forEach(d => (d.data().slots || []).forEach(s => taken.add(s)));
-    blSnap.forEach(d => (d.data().slots || []).forEach(s => taken.add(s)));
-    if (slots.some(s => taken.has(s))) return showToast(`Conflict on ${date} – slot already taken`, 'error');
-  }
-
+  // If booking crosses midnight (tempEndSlot > 24), split into two bookings (currentDate and nextDate)
   const seriesId = seriesType ? `series_${Date.now()}` : null;
   const batch    = writeBatch(db);
 
-  for (const date of dates) {
-    const ref = doc(collection(db, 'bookings'));
-    batch.set(ref, {
-      date, slots,
+  if (tempEndSlot > 24) {
+    if (seriesType) return showToast('Cross-midnight series not supported', 'error');
+    const nextDate = dateAdd(currentDate, 1);
+    // slots for current date: start..23
+    const slotsFirst = [];
+    for (let h = tempStartSlot; h < 24; h++) slotsFirst.push(h);
+    // slots for next date: 0..(end-24-1)
+    const slotsNext = [];
+    for (let h = 0; h < (tempEndSlot - 24); h++) slotsNext.push(h);
+
+    // Check conflicts for both dates
+    const [bSnap1, blSnap1, bSnap2, blSnap2] = await Promise.all([
+      getDocs(query(collection(db, 'bookings'), where('date', '==', currentDate))),
+      getDocs(query(collection(db, 'blockedSlots'), where('date', '==', currentDate))),
+      getDocs(query(collection(db, 'bookings'), where('date', '==', nextDate))),
+      getDocs(query(collection(db, 'blockedSlots'), where('date', '==', nextDate)))
+    ]);
+    const taken1 = new Set();
+    bSnap1.forEach(d => (d.data().slots || []).forEach(s => taken1.add(s)));
+    blSnap1.forEach(d => (d.data().slots || []).forEach(s => taken1.add(s)));
+    const taken2 = new Set();
+    bSnap2.forEach(d => (d.data().slots || []).forEach(s => taken2.add(s)));
+    blSnap2.forEach(d => (d.data().slots || []).forEach(s => taken2.add(s)));
+
+    if (slotsFirst.some(s => taken1.has(s))) return showToast(`Conflict on ${currentDate} – slot already taken`, 'error');
+    if (slotsNext.some(s => taken2.has(s))) return showToast(`Conflict on ${nextDate} – slot already taken`, 'error');
+
+    // create two booking docs with per-date amounts
+    const amountFirst = getPriceForDate(currentDate, slotsFirst.length);
+    const amountNext  = getPriceForDate(nextDate, slotsNext.length);
+
+    const ref1 = doc(collection(db, 'bookings'));
+    batch.set(ref1, {
+      date: currentDate, slots: slotsFirst,
       userId:        selectedUser.id,
       userName:      selectedUser.name,
       userPhone:     selectedUser.phone,
-      amount, notes,
+      amount: amountFirst,
+      notes,
       seriesId,
-      seriesType:    seriesType || null,
+      seriesType:    null,
       paymentStatus: 'pending',
       paymentMode:   null,
       upiAmount:     0,
@@ -549,9 +619,62 @@ window.saveBooking = async function() {
       paidAt:        null,
       createdAt:     Timestamp.now()
     });
-  }
 
-  await batch.commit();
+    const ref2 = doc(collection(db, 'bookings'));
+    batch.set(ref2, {
+      date: nextDate, slots: slotsNext,
+      userId:        selectedUser.id,
+      userName:      selectedUser.name,
+      userPhone:     selectedUser.phone,
+      amount: amountNext,
+      notes,
+      seriesId,
+      seriesType:    null,
+      paymentStatus: 'pending',
+      paymentMode:   null,
+      upiAmount:     0,
+      cashAmount:    0,
+      paymentNotes:  '',
+      paidAt:        null,
+      createdAt:     Timestamp.now()
+    });
+
+    await batch.commit();
+  } else {
+    // normal single-day booking (or series)
+    for (const date of dates) {
+      const [bSnap, blSnap] = await Promise.all([
+        getDocs(query(collection(db, 'bookings'),     where('date', '==', date))),
+        getDocs(query(collection(db, 'blockedSlots'), where('date', '==', date)))
+      ]);
+      const taken = new Set();
+      bSnap.forEach(d => (d.data().slots || []).forEach(s => taken.add(s)));
+      blSnap.forEach(d => (d.data().slots || []).forEach(s => taken.add(s)));
+      if (slots.some(s => taken.has(s))) return showToast(`Conflict on ${date} – slot already taken`, 'error');
+    }
+
+    for (const date of dates) {
+      const ref = doc(collection(db, 'bookings'));
+      batch.set(ref, {
+        date, slots,
+        userId:        selectedUser.id,
+        userName:      selectedUser.name,
+        userPhone:     selectedUser.phone,
+        amount, notes,
+        seriesId,
+        seriesType:    seriesType || null,
+        paymentStatus: 'pending',
+        paymentMode:   null,
+        upiAmount:     0,
+        cashAmount:    0,
+        paymentNotes:  '',
+        paidAt:        null,
+        createdAt:     Timestamp.now()
+      });
+    }
+
+    await batch.commit();
+  }
   // Send WhatsApp only for single booking
 // or first booking in a series
 const whatsappBooking = {
@@ -1117,6 +1240,8 @@ async function loadSettings() {
   const wd = settings.weekendDays || [0, 6];
   document.getElementById('wdSat').checked = wd.includes(6);
   document.getElementById('wdSun').checked = wd.includes(0);
+  // cross-midnight bookings setting (optional)
+  try { document.getElementById('settingAllowCrossMidnight').checked = !!settings.allowCrossMidnight; } catch(_) {}
 }
 
 window.saveSettings = async function() {
@@ -1127,9 +1252,10 @@ window.saveSettings = async function() {
   const weekendDays  = [];
   if (document.getElementById('wdSat').checked) weekendDays.push(6);
   if (document.getElementById('wdSun').checked) weekendDays.push(0);
+  const allowCrossMidnight = !!document.getElementById('settingAllowCrossMidnight') && document.getElementById('settingAllowCrossMidnight').checked;
 
-  await setDoc(doc(db, 'settings', 'pricing'), { weekdayPrice, weekendPrice, turfName, adminPhone, weekendDays });
-  settings = { weekdayPrice, weekendPrice, turfName, adminPhone, weekendDays };
+  await setDoc(doc(db, 'settings', 'pricing'), { weekdayPrice, weekendPrice, turfName, adminPhone, weekendDays, allowCrossMidnight });
+  settings = { weekdayPrice, weekendPrice, turfName, adminPhone, weekendDays, allowCrossMidnight };
   showToast('Settings saved', 'success');
 };
 

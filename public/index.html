@@ -293,6 +293,12 @@
         <label>Admin WhatsApp Number (with country code)</label>
         <input type="tel" id="settingAdminPhone" placeholder="919876543210" maxlength="15" />
       </div>
+      <div class="form-group">
+        <label>Allow Cross-Midnight Bookings</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" id="settingAllowCrossMidnight" /> Allow selecting slots that overlap past 12 AM</label>
+        </div>
+      </div>
     </div>
     <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
     <button class="btn-secondary btn-clear-cache" onclick="clearCacheAndReload()">Clear Cache & Reload</button>

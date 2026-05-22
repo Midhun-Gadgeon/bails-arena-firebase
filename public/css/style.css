@@ -648,6 +648,52 @@ select option { background: var(--surface2); }
 }
 .checkbox-group input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
+/* Switch-style checkboxes used in settings (.checkbox-group) */
+.checkbox-group {
+  align-items: center;
+}
+.checkbox-group label {
+  position: relative;
+  padding-left: 64px;
+}
+.checkbox-group input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.checkbox-group input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text);
+  top: 3px;
+  left: 3px;
+  transition: transform 0.18s;
+}
+.checkbox-group input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.checkbox-group input[type="checkbox"]:checked::after {
+  transform: translateX(20px);
+  background: #000;
+}
+.checkbox-group input[type="checkbox"]:focus {
+  outline: 2px solid rgba(0,230,118,0.12);
+}
+
 /* ===== BUTTONS ===== */
 .btn-primary {
   background: var(--accent);
