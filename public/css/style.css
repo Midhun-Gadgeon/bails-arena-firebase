@@ -99,6 +99,7 @@ body {
   color: var(--accent);
   letter-spacing: 1px;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .nav-actions {
