@@ -1158,22 +1158,51 @@ window.downloadExcel = function() {
   if (!window.XLSX) return showToast('Excel library not loaded', 'error');
   const includeStaff = shouldIncludeStaff();
 
-  const bookingRows = [
-    ['Date', 'Slot', 'Customer', 'Mobile', 'Amount (₹)', 'Payment Status', 'Payment Mode', 'UPI Amount', 'Cash Amount', 'Type', 'Notes'],
-    ...reportData.map(b => [
-      b.date,
-      fmtRange(b.slots),
-      b.userName || '',
-      b.userPhone || '',
-      b.amount || 0,
-      b.paymentStatus || 'pending',
-      b.paymentMode || '',
-      b.upiAmount || 0,
-      b.cashAmount || 0,
-      b.seriesType || 'Single',
-      b.notes || ''
-    ])
+  // Build summary metrics
+  const totalRev = reportData.reduce((s, b) => s + (b.amount || 0), 0);
+  const totalSlots = reportData.reduce((s, b) => s + (b.slots || []).length, 0);
+  const totalExpenses = expenseData.reduce((s, e) => s + (e.amount || 0), 0);
+  const totalSalary = includeStaff ? staffData.reduce((s, sf) => s + (sf.salary || 0), 0) : 0;
+  const unique = new Set(reportData.map(b => b.userId)).size;
+  const pending = reportData.filter(b => b.paymentStatus !== 'paid').reduce((s, b) => s + (b.amount || 0), 0);
+  const netAmount = totalRev - totalExpenses - totalSalary;
+
+  // Summary table (2-column) and a clear title for the bookings section
+  const summaryRows = [
+    ['Report Summary'],
+    [],
+    ['Metric', 'Value'],
+    ['Bookings', reportData.length],
+    ['Hours Booked', totalSlots],
+    ['Revenue (₹)', totalRev],
+    ['Expenses (₹)', totalExpenses]
   ];
+  if (includeStaff) summaryRows.push(['Staff Salary (₹)', totalSalary]);
+  summaryRows.push(['Net (₹)', netAmount], ['Customers', unique], ['Pending (₹)', pending], []);
+
+  const bookingHeader = ['Date', 'Slot', 'Customer', 'Mobile', 'Amount (₹)', 'Payment Status', 'Payment Mode', 'UPI Amount', 'Cash Amount', 'Type', 'Notes'];
+  const bookingDataRows = reportData.map(b => [
+    b.date,
+    fmtRange(b.slots),
+    b.userName || '',
+    b.userPhone || '',
+    b.amount || 0,
+    b.paymentStatus || 'pending',
+    b.paymentMode || '',
+    b.upiAmount || 0,
+    b.cashAmount || 0,
+    b.seriesType || 'Single',
+    b.notes || ''
+  ]);
+
+  // Create a titled bookings section: a title row, a blank row, then header + rows
+  const bookingRows = [
+    ['Bookings'],
+    [],
+    bookingHeader,
+    ...bookingDataRows
+  ];
+
   const expenseRows = [
     ['Date', 'Category', 'Amount (₹)', 'Notes'],
     ...expenseData.map(e => [e.date, e.category || '', e.amount || 0, e.notes || ''])
@@ -1184,11 +1213,127 @@ window.downloadExcel = function() {
   ] : null;
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookingRows), 'Bookings');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expenseRows), 'Expenses');
+
+  // Combine all sections into a single sheet
+  const combined = [];
+  // summaryRows already contains its internal blank rows
+  combined.push(...summaryRows);
+
+  const bookingsStartRow = combined.length;
+  combined.push(...bookingRows);
+
+  const expensesStartRow = combined.length;
+  combined.push(...[['Expenses'], [], ['Date', 'Category', 'Amount (₹)', 'Notes']]);
+  combined.push(...expenseRows.slice(1)); // expenseRows has header at [0]
+
+  let staffStartRow = null;
   if (staffRows) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffRows), 'Staff');
+    staffStartRow = combined.length;
+    combined.push(...[['Staff'], [], ['Name', 'Role', 'Phone', 'Salary (₹)', 'Status']]);
+    combined.push(...staffRows.slice(1));
   }
+
+  const ws = XLSX.utils.aoa_to_sheet(combined);
+
+  // Helper for styling
+  function setCellStyle(r, c, style) {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    // create empty cell if missing so styles (borders/fill) get written
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+    ws[addr].s = Object.assign({}, ws[addr].s || {}, style);
+  }
+
+  // Merge title rows across all booking columns (use 10 as last col index)
+  const lastCol = 10;
+  ws['!merges'] = ws['!merges'] || [];
+  // Summary title (first row)
+  ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } });
+  // Bookings title
+  ws['!merges'].push({ s: { r: bookingsStartRow, c: 0 }, e: { r: bookingsStartRow, c: lastCol } });
+  // Expenses title
+  ws['!merges'].push({ s: { r: expensesStartRow, c: 0 }, e: { r: expensesStartRow, c: lastCol } });
+  // Staff title
+  if (staffStartRow !== null) {
+    ws['!merges'].push({ s: { r: staffStartRow, c: 0 }, e: { r: staffStartRow, c: lastCol } });
+  }
+
+  // Style titles (bold, centered, background)
+  const titleStyle = { font: { bold: true, sz: 14 }, alignment: { horizontal: 'center' }, fill: { patternType: 'solid', fgColor: { rgb: 'FFDDEBF7' } } };
+  const sectionStyle = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'center' }, fill: { patternType: 'solid', fgColor: { rgb: 'FFF2F2F2' } } };
+  setCellStyle(0, 0, titleStyle);
+  for (let c = 1; c <= lastCol; c++) setCellStyle(0, c, titleStyle);
+  setCellStyle(bookingsStartRow, 0, sectionStyle);
+  for (let c = 1; c <= lastCol; c++) setCellStyle(bookingsStartRow, c, sectionStyle);
+  setCellStyle(expensesStartRow, 0, sectionStyle);
+  for (let c = 1; c <= lastCol; c++) setCellStyle(expensesStartRow, c, sectionStyle);
+  if (staffStartRow !== null) {
+    setCellStyle(staffStartRow, 0, sectionStyle);
+    for (let c = 1; c <= lastCol; c++) setCellStyle(staffStartRow, c, sectionStyle);
+  }
+
+  // Style headers (bold + border)
+  function applyHeaderStyle(rowIndex, cols) {
+    for (let c = 0; c <= cols; c++) {
+      setCellStyle(rowIndex, c, {
+        font: { bold: true },
+        fill: { patternType: 'solid', fgColor: { rgb: 'FFEEECE1' } },
+        alignment: { horizontal: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'FF000000' } },
+          bottom: { style: 'thin', color: { rgb: 'FF000000' } },
+          left: { style: 'thin', color: { rgb: 'FF000000' } },
+          right: { style: 'thin', color: { rgb: 'FF000000' } }
+        }
+      });
+    }
+  }
+
+  // booking header row is bookingsStartRow + 2 (title + blank)
+  const bookingHeaderRow = bookingsStartRow + 2;
+  applyHeaderStyle(bookingHeaderRow, lastCol);
+
+  // expense header row is expensesStartRow + 2
+  const expenseHeaderRow = expensesStartRow + 2;
+  applyHeaderStyle(expenseHeaderRow, Math.max(3, lastCol));
+
+  // staff header row
+  if (staffStartRow !== null) {
+    const staffHeaderRow = staffStartRow + 2;
+    applyHeaderStyle(staffHeaderRow, lastCol);
+  }
+
+  // Apply thin border to data rows for bookings, expenses and staff
+  function applyTableBorders(startRow, headerRow, rowCount, colCount) {
+    for (let r = headerRow; r < headerRow + rowCount; r++) {
+      for (let c = 0; c <= colCount; c++) {
+        setCellStyle(r, c, {
+          border: {
+            top: { style: 'thin', color: { rgb: 'FF000000' } },
+            bottom: { style: 'thin', color: { rgb: 'FF000000' } },
+            left: { style: 'thin', color: { rgb: 'FF000000' } },
+            right: { style: 'thin', color: { rgb: 'FF000000' } }
+          }
+        });
+      }
+    }
+  }
+
+  const bookingDataRowCount = bookingDataRows.length + 1; // include header
+  applyTableBorders(bookingsStartRow, bookingHeaderRow, bookingDataRowCount, lastCol);
+
+  const expenseDataRowCount = expenseRows.length; // includes header row
+  applyTableBorders(expensesStartRow, expenseHeaderRow, expenseDataRowCount, 3);
+
+  if (staffStartRow !== null) {
+    const staffDataRowCount = staffRows.length; // includes header
+    const staffHeaderRow = staffStartRow + 2;
+    applyTableBorders(staffStartRow, staffHeaderRow, staffDataRowCount, lastCol);
+  }
+
+  // Auto column widths (simple heuristic)
+  ws['!cols'] = Array.from({ length: lastCol + 1 }).map(() => ({ wch: 16 }));
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Report');
   XLSX.writeFile(wb, `bails-arena-report-${todayStr()}.xlsx`);
 };
 
