@@ -421,6 +421,8 @@ body {
   max-width: 560px;
   padding: 12px 20px 32px;
   animation: slideUp 0.22s ease;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .sheet-handle {
@@ -897,17 +899,30 @@ select option { background: var(--surface2); }
 .filter-block input { max-width: 180px; }
 
 .report-summary {
-  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; 
+}
+.report-actions {
+  margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; 
 }
 .summary-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
-  flex: 1; min-width: 110px;
+  flex: 1 1 25%; min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 .summary-card .sc-val {
-  font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--accent);
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1rem, 3.5vw, 1.4rem);
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
 }
 .summary-card .sc-label {
   font-size: 0.72rem; color: var(--text-dim); margin-top: 3px;

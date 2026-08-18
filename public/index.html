@@ -219,6 +219,10 @@
     <div id="reportOutput" class="report-output hidden">
       
       <div class="report-summary" id="reportSummary"></div>
+      <div class="report-actions">
+        <button class="btn-secondary" onclick="downloadExcel()">📥 Download Excel</button>
+        <button class="btn-secondary" onclick="downloadCSV()">📥 Download CSV</button>
+      </div>
       <div class="table-wrap">
         <table id="reportTable">
           <thead>
@@ -251,10 +255,6 @@
             <tbody id="reportStaffBody"></tbody>
           </table>
         </div>
-      </div>
-      <div class="report-actions">
-        <button class="btn-secondary" onclick="downloadExcel()">📥 Download Excel</button>
-        <button class="btn-secondary" onclick="downloadCSV()">📥 Download CSV</button>
       </div>
     </div>
   </div>
